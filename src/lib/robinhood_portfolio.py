@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import yfinance as yf
 # Load environment variables from .env file
 load_dotenv()
+#just adding
 
 # Get credentials from environment variables
 username = os.getenv("ROBINHOOD_USERNAME")
