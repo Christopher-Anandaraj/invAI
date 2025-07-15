@@ -158,6 +158,7 @@ function getSectorData(holdings: Holding[]) {
 const sectorColors = ['#60a5fa', '#f59e42', '#34d399', '#f87171', '#a78bfa', '#fbbf24', '#818cf8'];
 
 export function PortfolioDashboard() {
+  const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000';
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [portfolioSummary, setPortfolioSummary] = useState<string>("");
@@ -249,7 +250,7 @@ export function PortfolioDashboard() {
       (async () => {
         try {
           const symbols = holdings.map(h => h.symbol).join(',');
-          const response = await fetch(`http://localhost:8000/sector-allocation?symbols=${encodeURIComponent(symbols)}`);
+          const response = await fetch(`${backendUrl}/sector-allocation?symbols=${encodeURIComponent(symbols)}`);
           const data = await response.json();
           
           // Convert the backend response to the format expected by the pie chart
@@ -321,7 +322,7 @@ export function PortfolioDashboard() {
       
       try {
         const symbols = holdings.map(h => h.symbol);
-        const response = await fetch(`http://localhost:8000/sparklines?symbols=${symbols.join(',')}`);
+        const response = await fetch(`${backendUrl}/sparklines?symbols=${symbols.join(',')}`);
         const data = await response.json();
         
         const map: Record<string, number[]> = {};

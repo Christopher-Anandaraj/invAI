@@ -87,6 +87,7 @@ const CustomTooltip = ({ active, label, coordinate }: any) => {
 };
 
 export function StockDetailPage({ symbol, onBack }: StockDetailPageProps) {
+  const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000';
   const [stockData, setStockData] = useState<StockData | null>(null);
   const [stockSummary, setStockSummary] = useState<StockSummary | null>(null);
   const [chartData, setChartData] = useState<ChartData[]>([]);
@@ -114,7 +115,7 @@ export function StockDetailPage({ symbol, onBack }: StockDetailPageProps) {
     lastSentimentSymbol.current = null;
     const fetchSummary = async () => {
       try {
-        const response = await fetch(`http://localhost:8000/stock-detail?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`);
+        const response = await fetch(`${backendUrl}/stock-detail?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`);
         const data = await response.json();
         if (data.success && data.stockSummary) {
           setStockSummary(data.stockSummary);
@@ -150,7 +151,7 @@ export function StockDetailPage({ symbol, onBack }: StockDetailPageProps) {
     setLoadingChart(true);
     setChartData([]); // Clear chart data immediately to prevent flash of old chart
     try {
-      const response = await fetch(`http://localhost:8000/stock-detail?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`);
+      const response = await fetch(`${backendUrl}/stock-detail?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`);
       const data = await response.json();
       if (data.success) {
         const chartData = data.chartData;
@@ -278,7 +279,7 @@ export function StockDetailPage({ symbol, onBack }: StockDetailPageProps) {
       
       const prompt = `Analyze the sentiment of these news articles about ${symbol}. Provide a concise analysis of the overall market sentiment and any potential impact on the stock price. Keep it to 2-3 sentences.\n\n${newsText}`;
       
-      const response = await fetch('/api/asset-insights', {
+      const response = await fetch(`/api/asset-insights`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt })

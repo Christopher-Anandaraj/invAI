@@ -1,0 +1,6 @@
+fastapi
+requests
+yfinance
+robin_stocks
+python-dotenv
+uvicorn 
