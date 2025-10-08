@@ -28,29 +28,16 @@ function parseAmount(amountStr: string): number {
   return parseFloat(cleaned) || 0;
 }
 
-const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
-
+// Use server-side API to avoid exposing API keys in the browser
 async function getGeminiSummary(csvText: string): Promise<string> {
   try {
-    if (!GEMINI_API_KEY) {
-      return "No Gemini API key set in environment.";
-    }
     const prompt = `Summarize this investment report in plain English. Highlight key holdings, trends, and any unusual activity. Limit your answer to 3 sentences.\n\n${csvText}`;
     const response = await axios.post(
-      GEMINI_API_URL + `?key=${GEMINI_API_KEY}`,
-      {
-        contents: [
-          {
-            parts: [
-              { text: prompt }
-            ]
-          }
-        ]
-      },
+      '/api/asset-insights',
+      { prompt },
       { headers: { "Content-Type": "application/json" } }
     );
-    let text = response.data.candidates?.[0]?.content?.parts?.[0]?.text || "No summary returned.";
+    let text = response.data.insight || "No summary returned.";
     // Truncate to 3 sentences max
     const sentences = text.match(/[^.!?]+[.!?]+/g);
     if (sentences && sentences.length > 3) {

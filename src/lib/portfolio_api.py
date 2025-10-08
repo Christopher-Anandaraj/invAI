@@ -60,7 +60,7 @@ def get_gemini_insight(symbol, prices):
             headers={"Content-Type": "application/json"}
         )
         print(f"[Gemini Insight] Status: {response.status_code}")
-        print(f"[Gemini Insight] Response: {response.text}")
+        # Do not log response text as it may contain sensitive information
         data = response.json()
         return data.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', 'No insight returned.')
     except Exception as e:
