@@ -525,3 +525,4 @@ def get_stock_detail(symbol: str = Query(..., description="Stock symbol"), timef
     except Exception as e:
         print(f"Error fetching stock detail for {symbol}: {e}")
         return {"error": f"Failed to fetch stock data for {symbol}"} 
+        #
