@@ -3,4 +3,5 @@ requests
 yfinance
 robin_stocks
 python-dotenv
-uvicorn 
+uvicorn
+pymysql 

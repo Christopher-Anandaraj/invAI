@@ -3,7 +3,9 @@ import { NextResponse } from 'next/server';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get('symbol');
-  const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
+  const BACKEND_URL = process.env.NODE_ENV === 'production' 
+    ? process.env.BACKEND_URL || 'https://backend.chrisbuilds.dev'
+    : 'http://localhost:8000';
   const backendUrl = symbol
     ? `${BACKEND_URL}/asset-insights?symbol=${encodeURIComponent(symbol)}`
     : `${BACKEND_URL}/asset-insights`;

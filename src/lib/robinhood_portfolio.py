@@ -2,9 +2,12 @@ import robin_stocks.robinhood as r
 import os
 from dotenv import load_dotenv
 import yfinance as yf
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__)))
+from sql import upsert_portfolio_data
 # Load environment variables from .env file
 load_dotenv()
-#just adding
 
 # Get credentials from environment variables
 username = os.getenv("ROBINHOOD_USERNAME")
@@ -21,6 +24,7 @@ r.login(
 
 # Fetch holdings
 holdings_raw = r.build_holdings()
+print(holdings_raw)
 portfolio = []
 if holdings_raw and isinstance(holdings_raw, dict):
     for symbol, info in holdings_raw.items():
@@ -29,6 +33,24 @@ if holdings_raw and isinstance(holdings_raw, dict):
         shares = float(info["quantity"])
         equity = float(info["equity"])
         percent_change = ((current_price - avg_price) / avg_price) * 100 if avg_price != 0 else 0
+        
+        # Save to database
+        upsert_portfolio_data(
+            symbol=symbol,
+            name=info.get("name", ""),
+            shares=shares,
+            avg_price=avg_price,
+            current_price=current_price,
+            equity=equity,
+            equity_change=float(info.get("equity_change", 0)),
+            percent_change=round(percent_change, 2),
+            intraday_percent_change=float(info.get("intraday_percent_change", 0)),
+            pe_ratio=float(info.get("pe_ratio", 0)) if info.get("pe_ratio") else None,
+            portfolio_percentage=float(info.get("percentage", 0)),
+            asset_type=info.get("type", "stock"),
+            market="NASDAQ"  # Default market, could be enhanced to detect actual market
+        )
+        
         portfolio.append({
             "symbol": symbol,
             "shares": shares,
@@ -60,6 +82,24 @@ if crypto_positions:
                     price = float(quote['mark_price'])
                 equity = quantity * price
                 percent_change = ((price - avg_price) / avg_price) * 100 if avg_price != 0 else 0
+                
+                # Save to database
+                upsert_portfolio_data(
+                    symbol=symbol,
+                    name=f"{symbol} Coin",
+                    shares=quantity,
+                    avg_price=avg_price,
+                    current_price=round(price, 2),
+                    equity=round(equity, 2),
+                    equity_change=0.0,
+                    percent_change=round(percent_change, 2),
+                    intraday_percent_change=0.0,
+                    pe_ratio=None,
+                    portfolio_percentage=0.0,
+                    asset_type="crypto",
+                    market="CRYPTO"
+                )
+                
                 portfolio.append({
                     "symbol": symbol,
                     "shares": quantity,

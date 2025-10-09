@@ -180,6 +180,7 @@ export function PortfolioDashboard() {
   const [showInsightModal, setShowInsightModal] = useState(false);
   const [selectedStock, setSelectedStock] = useState<string | null>(null);
   const [logoSize, setLogoSize] = useState<number>(80); // Logo size in pixels
+  const [refreshing, setRefreshing] = useState(false);
 
 
   React.useEffect(() => {
@@ -189,24 +190,36 @@ export function PortfolioDashboard() {
     }
   }, [portfolioSummary, loadingSummary]);
 
-  // Fetch portfolio from backend API on mount and every 1 minute
+  // Fetch portfolio from backend API on mount only
   useEffect(() => {
-    let interval: NodeJS.Timeout;
     async function fetchPortfolio() {
       try {
         const res = await fetch("/api/portfolio");
         const data = await res.json();
         if (Array.isArray(data)) {
-          setHoldings(data);
+          // Remove duplicates based on symbol
+          const uniqueHoldings = data.reduce((acc: Holding[], current: Holding) => {
+            const existingIndex = acc.findIndex(h => h.symbol === current.symbol);
+            if (existingIndex === -1) {
+              acc.push(current);
+            } else {
+              // Keep the most recent entry (assuming last_updated or higher equity)
+              if (current.equity > acc[existingIndex].equity) {
+                acc[existingIndex] = current;
+              }
+            }
+            return acc;
+          }, []);
+          
+          setHoldings(uniqueHoldings);
           setInitialLoading(false); // Set loading to false after first load
         }
       } catch (err) {
         setError("Failed to fetch portfolio from backend.");
+        setInitialLoading(false);
       }
     }
     fetchPortfolio();
-    interval = setInterval(fetchPortfolio, 60000); // 1 minute
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -298,6 +311,45 @@ export function PortfolioDashboard() {
   // Handle stock row click
   const handleStockClick = (symbol: string) => {
     setSelectedStock(symbol);
+  };
+
+  // Manual refresh function
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // Refresh backend data from Robinhood
+      const refreshRes = await fetch(`${backendUrl}/portfolio/refresh`, {
+        method: 'POST'
+      });
+      const refreshData = await refreshRes.json();
+      
+      if (refreshData.message) {
+        // Fetch updated portfolio data
+        const res = await fetch("/api/portfolio");
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          // Remove duplicates based on symbol
+          const uniqueHoldings = data.reduce((acc: Holding[], current: Holding) => {
+            const existingIndex = acc.findIndex(h => h.symbol === current.symbol);
+            if (existingIndex === -1) {
+              acc.push(current);
+            } else {
+              // Keep the most recent entry (assuming last_updated or higher equity)
+              if (current.equity > acc[existingIndex].equity) {
+                acc[existingIndex] = current;
+              }
+            }
+            return acc;
+          }, []);
+          
+          setHoldings(uniqueHoldings);
+        }
+      }
+    } catch (err) {
+      setError("Failed to refresh portfolio data.");
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   // Filtering logic
@@ -432,6 +484,28 @@ export function PortfolioDashboard() {
               <div className="flex flex-col md:flex-row items-start md:items-center gap-4 ml-16 mb-2 max-w-7xl justify-between">
                 <h2 className="text-2xl font-bold text-white">Portfolio Summary</h2>
                 <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
+                  <button
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                  >
+                    {refreshing ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                        </svg>
+                        Refreshing...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Refresh
+                      </>
+                    )}
+                  </button>
           <input
                     type="text"
                     placeholder="Search by symbol or keyword..."

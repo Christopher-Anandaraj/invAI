@@ -10,9 +10,15 @@ from fastapi import Query
 from typing import Optional
 from collections import defaultdict
 from fastapi.responses import JSONResponse
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__)))
+from sql import upsert_portfolio_data, get_portfolio_data
 
 app = FastAPI()
+# Load environment variables
 load_dotenv()
+
 # Allow CORS for local frontend
 app.add_middleware(
     CORSMiddleware,
@@ -21,8 +27,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-load_dotenv()
 
 # Helper: get 5-day price history for a symbol using yfinance
 def get_5day_history(symbol: str):
@@ -82,30 +86,116 @@ def get_sparkline_data(symbol):
 
 @app.get("/portfolio")
 def get_portfolio():
+    """
+    Get portfolio data from SQL database only
+    """
+    try:
+        portfolio_data = get_portfolio_data()
+        if portfolio_data:
+            # Convert database format to API format
+            portfolio = []
+            for row in portfolio_data:
+                portfolio.append({
+                    "symbol": row["symbol"],
+                    "name": row.get("name", ""),
+                    "shares": float(row["shares"]),
+                    "avg_price": float(row["avg_price"]),
+                    "current_price": float(row["current_price"]),
+                    "equity": float(row["equity"]),
+                    "equity_change": float(row.get("equity_change", 0)),
+                    "percent_change": float(row["percent_change"]),
+                    "intraday_percent_change": float(row.get("intraday_percent_change", 0)),
+                    "pe_ratio": float(row["pe_ratio"]) if row.get("pe_ratio") else None,
+                    "portfolio_percentage": float(row.get("portfolio_percentage", 0)),
+                    "asset_type": row["asset_type"],
+                    "market": row["market"],
+                    "last_updated": row["last_updated"]
+                })
+            
+            return portfolio
+        else:
+            return []
+    except Exception as e:
+        print(f"Failed to get portfolio from database: {e}")
+        return {"error": f"Failed to retrieve portfolio from database: {str(e)}"}
+
+def update_portfolio_from_robinhood():
+    """
+    Background function to update portfolio data from Robinhood
+    """
+    try:
+        print("Background: Updating portfolio from Robinhood...")
+        fetch_portfolio_from_robinhood()
+        print("Background: Portfolio update completed")
+    except Exception as e:
+        print(f"Background: Failed to update portfolio: {e}")
+
+def fetch_portfolio_from_robinhood():
+    """
+    Fetch portfolio data from Robinhood and save to database
+    """
     username = os.getenv("ROBINHOOD_USERNAME")
     password = os.getenv("ROBINHOOD_PASSWORD")
     if not username or not password:
         return {"error": "Missing credentials in .env"}
+    
     # Do not print or log sensitive values
     r.login(username=username, password=password, store_session=True)
+    
     # Stocks
     holdings_raw = r.build_holdings()
     portfolio = []
     if holdings_raw and isinstance(holdings_raw, dict):
         for symbol, info in holdings_raw.items():
-            avg_price = float(info["average_buy_price"])
-            current_price = float(info["price"])
-            shares = float(info["quantity"])
-            equity = float(info["equity"])
-            percent_change = ((current_price - avg_price) / avg_price) * 100 if avg_price != 0 else 0
+            # Extract all fields from holdings_raw
+            name = info.get("name", "")
+            shares = float(info.get("quantity", 0))
+            avg_price = float(info.get("average_buy_price", 0))
+            current_price = float(info.get("price", 0))
+            equity = float(info.get("equity", 0))
+            equity_change = float(info.get("equity_change", 0))
+            percent_change = float(info.get("percent_change", 0))
+            intraday_percent_change = float(info.get("intraday_percent_change", 0))
+            pe_ratio = float(info.get("pe_ratio", 0)) if info.get("pe_ratio") else None
+            portfolio_percentage = float(info.get("percentage", 0))
+            asset_type = info.get("type", "stock")
+            
+            # Determine market based on asset type
+            market = "NASDAQ" if asset_type == "stock" else "NYSE" if asset_type == "etp" else "CRYPTO"
+            
+            # Save to database
+            upsert_portfolio_data(
+                symbol=symbol,
+                name=name,
+                shares=shares,
+                avg_price=avg_price,
+                current_price=current_price,
+                equity=equity,
+                equity_change=equity_change,
+                percent_change=percent_change,
+                intraday_percent_change=intraday_percent_change,
+                pe_ratio=pe_ratio,
+                portfolio_percentage=portfolio_percentage,
+                asset_type=asset_type,
+                market=market
+            )
+            
             portfolio.append({
                 "symbol": symbol,
+                "name": name,
                 "shares": shares,
                 "avg_price": avg_price,
-                "equity": equity,
                 "current_price": current_price,
-                "percent_change": round(percent_change, 2)
+                "equity": equity,
+                "equity_change": equity_change,
+                "percent_change": percent_change,
+                "intraday_percent_change": intraday_percent_change,
+                "pe_ratio": pe_ratio,
+                "portfolio_percentage": portfolio_percentage,
+                "asset_type": asset_type,
+                "market": market
             })
+    
     # Crypto
     crypto_positions = r.crypto.get_crypto_positions()
     if crypto_positions:
@@ -127,15 +217,82 @@ def get_portfolio():
                     price = float(quote['mark_price'])
                 equity = quantity * price
                 percent_change = ((price - avg_price) / avg_price) * 100 if avg_price != 0 else 0
+                
+                # Save to database
+                upsert_portfolio_data(
+                    symbol=symbol,
+                    name=f"{symbol} Coin",  # Default crypto name
+                    shares=quantity,
+                    avg_price=avg_price,
+                    current_price=round(price, 2),
+                    equity=round(equity, 2),
+                    equity_change=0.0,  # Not available for crypto
+                    percent_change=round(percent_change, 2),
+                    intraday_percent_change=0.0,  # Not available for crypto
+                    pe_ratio=None,  # Not applicable for crypto
+                    portfolio_percentage=0.0,  # Would need total portfolio value to calculate
+                    asset_type="crypto",
+                    market="CRYPTO"
+                )
+                
                 portfolio.append({
                     "symbol": symbol,
+                    "name": f"{symbol} Coin",
                     "shares": quantity,
                     "avg_price": avg_price,
-                    "equity": round(equity, 2),
                     "current_price": round(price, 2),
-                    "percent_change": round(percent_change, 2)
+                    "equity": round(equity, 2),
+                    "equity_change": 0.0,
+                    "percent_change": round(percent_change, 2),
+                    "intraday_percent_change": 0.0,
+                    "pe_ratio": None,
+                    "portfolio_percentage": 0.0,
+                    "asset_type": "crypto",
+                    "market": "CRYPTO"
                 })
+    
     return portfolio
+
+@app.post("/portfolio/refresh")
+def refresh_portfolio():
+    """
+    Manually refresh portfolio data from Robinhood
+    """
+    try:
+        portfolio = fetch_portfolio_from_robinhood()
+        return {"message": "Portfolio refreshed successfully", "count": len(portfolio)}
+    except Exception as e:
+        return {"error": f"Failed to refresh portfolio: {str(e)}"}
+
+@app.get("/portfolio/db")
+def get_portfolio_from_db():
+    """
+    Retrieve portfolio data from MySQL database.
+    """
+    try:
+        portfolio_data = get_portfolio_data()
+        # Convert database format to API format
+        portfolio = []
+        for row in portfolio_data:
+            portfolio.append({
+                "symbol": row["symbol"],
+                "name": row.get("name", ""),
+                "shares": float(row["shares"]),
+                "avg_price": float(row["avg_price"]),
+                "current_price": float(row["current_price"]),
+                "equity": float(row["equity"]),
+                "equity_change": float(row.get("equity_change", 0)),
+                "percent_change": float(row["percent_change"]),
+                "intraday_percent_change": float(row.get("intraday_percent_change", 0)),
+                "pe_ratio": float(row["pe_ratio"]) if row.get("pe_ratio") else None,
+                "portfolio_percentage": float(row.get("portfolio_percentage", 0)),
+                "asset_type": row["asset_type"],
+                "market": row["market"],
+                "last_updated": row["last_updated"]
+            })
+        return portfolio
+    except Exception as e:
+        return {"error": f"Failed to retrieve portfolio from database: {str(e)}"}
 
 @app.get("/asset-insights")
 def asset_insights(request: Request):

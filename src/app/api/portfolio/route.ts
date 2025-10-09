@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-  // Fetch from Python backend (assume FastAPI/Flask running at localhost:8000)
-  const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
+  // Use local backend for development, remote for production
+  const BACKEND_URL = process.env.NODE_ENV === 'production' 
+    ? process.env.BACKEND_URL || 'https://backend.chrisbuilds.dev'
+    : 'http://localhost:8000';
   console.log('Using BACKEND_URL:', BACKEND_URL); // Debug log
   try {
     const res = await fetch(`${BACKEND_URL}/portfolio`);
