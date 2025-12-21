@@ -28,40 +28,43 @@ def get_db_connection():
         raise
 
 def upsert_portfolio_data(symbol, name, shares, avg_price, current_price, equity, equity_change, percent_change, intraday_percent_change, pe_ratio, portfolio_percentage, asset_type, market):
-    """
-    Insert or update portfolio data in the MySQL database.
-    Fields: id, symbol, name, shares, avg_price, current_price, equity, equity_change, percent_change, intraday_percent_change, pe_ratio, portfolio_percentage, asset_type, market, last_updated
-    """
+    conn = get_db_connection()
     try:
-        conn = get_db_connection()
-        try:
-            with conn.cursor() as cur:
+        with conn.cursor() as cur:
+            # Check if symbol exists
+            cur.execute("SELECT id FROM portfolio WHERE symbol=%s", (symbol,))
+            result = cur.fetchone()
+            
+            if result:
+                # Update existing row
                 cur.execute("""
-                    INSERT INTO portfolio (symbol, name, shares, avg_price, current_price, equity, equity_change, percent_change, intraday_percent_change, pe_ratio, portfolio_percentage, asset_type, market, last_updated)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ON DUPLICATE KEY UPDATE 
+                    UPDATE portfolio SET
                         name=%s,
-                        shares=%s, 
-                        avg_price=%s, 
+                        shares=%s,
+                        avg_price=%s,
                         current_price=%s,
-                        equity=%s, 
+                        equity=%s,
                         equity_change=%s,
-                        percent_change=%s, 
+                        percent_change=%s,
                         intraday_percent_change=%s,
                         pe_ratio=%s,
                         portfolio_percentage=%s,
-                        asset_type=%s, 
-                        market=%s, 
+                        asset_type=%s,
+                        market=%s,
                         last_updated=%s
-                """, (
-                    symbol, name, shares, avg_price, current_price, equity, equity_change, percent_change, intraday_percent_change, pe_ratio, portfolio_percentage, asset_type, market, datetime.now(),
-                    name, shares, avg_price, current_price, equity, equity_change, percent_change, intraday_percent_change, pe_ratio, portfolio_percentage, asset_type, market, datetime.now()
-                ))
-        finally:
-            conn.close()
-    except Exception as e:
-        print(f"Failed to save portfolio data for {symbol}: {e}")
-        print("Continuing without database storage...")
+                    WHERE symbol=%s
+                """, (name, shares, avg_price, current_price, equity, equity_change, percent_change, intraday_percent_change, pe_ratio, portfolio_percentage, asset_type, market, datetime.now(), symbol))
+            else:
+                # Insert new row
+                cur.execute("""
+                    INSERT INTO portfolio
+                    (symbol, name, shares, avg_price, current_price, equity, equity_change, percent_change, intraday_percent_change, pe_ratio, portfolio_percentage, asset_type, market, last_updated)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (symbol, name, shares, avg_price, current_price, equity, equity_change, percent_change, intraday_percent_change, pe_ratio, portfolio_percentage, asset_type, market, datetime.now()))
+        conn.commit()
+    finally:
+        conn.close()
+
 
 def get_portfolio_data():
     """

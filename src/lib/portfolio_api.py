@@ -47,7 +47,7 @@ def get_5day_history(symbol: str):
 # Helper: call Gemini for a 1-sentence insight
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 # Do not print or log sensitive values
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 def get_gemini_insight(symbol, prices):
     if not GEMINI_API_KEY or not prices:
         print("[Gemini Insight] Missing API key or prices.")
