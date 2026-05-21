@@ -1,36 +1,182 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# invAI — AI-Powered Investment Dashboard
 
-## Getting Started
+> A personal portfolio dashboard that connects to Robinhood, enriches holdings with real-time market data, and surfaces AI-generated insights powered by Google Gemini.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## ✨ Features
+
+| Feature | Description |
+|---|---|
+| 📊 **Live Portfolio** | Pulls stocks & crypto directly from your Robinhood account |
+| 📈 **Sparklines** | 7-day price trend charts for every holding |
+| 🤖 **AI Insights** | Per-asset Gemini analysis with trend summaries and forecasts |
+| 📰 **News Feed** | Latest headlines per ticker via Finnhub |
+| 🥧 **Sector Allocation** | Breakdown of portfolio weight by sector |
+| 🔒 **Server-side API calls** | All secrets stay server-side — nothing is exposed to the browser |
+| ⚡ **Smart Caching** | Portfolio data is cached in MySQL, keeping the UI snappy |
+
+---
+
+## 🏗️ Architecture
+
+```
+┌──────────────────────────────────────────────────────┐
+│                   Next.js Frontend                   │
+│  (React 19 · Tailwind CSS · Recharts · Lucide)       │
+│                                                      │
+│  /dashboard  ──►  API Routes (/api/*)                │
+└───────────────────────┬──────────────────────────────┘
+                        │ HTTP
+┌───────────────────────▼──────────────────────────────┐
+│              FastAPI Backend (Python)                │
+│                                                      │
+│  Robinhood (robin-stocks)  ──►  MySQL (portfolio)    │
+│  Yahoo Finance (yfinance)  ──►  Gemini API           │
+│  Finnhub API               ──►  /sparklines          │
+└──────────────────────────────────────────────────────┘
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🚀 Quick Start
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Prerequisites
 
-## Learn More
+- Node.js 18+
+- Python 3.10+
+- MySQL 8+
 
-To learn more about Next.js, take a look at the following resources:
+### 1 — Clone & install
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+git clone https://github.com/Christopher-Anandaraj/invAI.git
+cd invAI
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Frontend
+npm install
 
-## Deploy on Vercel
+# Backend
+pip install -r requirements.txt
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 2 — Configure environment variables
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+cp .env.example .env
+```
+
+Open `.env` and fill in your credentials:
+
+```env
+# Robinhood
+ROBINHOOD_USERNAME=your_email@example.com
+ROBINHOOD_PASSWORD=your_password
+
+# Google Gemini
+GEMINI_API_KEY=your_gemini_api_key
+
+# Finnhub
+FINNHUB_API_KEY=your_finnhub_api_key
+
+# MySQL
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your_db_password
+DB_NAME=invai
+
+# Next.js (production only)
+BACKEND_URL=https://your-backend-domain.com
+```
+
+> ⚠️ **Never commit `.env` to source control.** It is already in `.gitignore`.
+
+### 3 — Set up the database
+
+```bash
+mysql -u root -p < mysql_schema.sql
+```
+
+See [setup_database.md](./setup_database.md) for detailed instructions.
+
+### 4 — Run in development
+
+```bash
+# Terminal 1 — Next.js frontend
+npm run dev
+
+# Terminal 2 — FastAPI backend
+python run_backend.py
+```
+
+- Frontend → [http://localhost:3000](http://localhost:3000)
+- Backend API → [http://localhost:8000](http://localhost:8000)
+
+---
+
+## 📁 Project Structure
+
+```
+invAI/
+├── src/
+│   ├── app/
+│   │   ├── api/                  # Next.js server-side API routes
+│   │   │   ├── portfolio/        # Portfolio data proxy
+│   │   │   ├── asset-insights/   # Gemini AI insights
+│   │   │   └── login/            # Robinhood auth (+ 2FA)
+│   │   ├── dashboard/            # Main dashboard page
+│   │   └── page.tsx              # Landing / bot-check page
+│   ├── components/
+│   │   ├── PortfolioDashboard.tsx  # Main dashboard component
+│   │   └── StockDetailPage.tsx     # Individual asset view
+│   └── lib/
+│       ├── portfolio_api.py        # FastAPI app (core backend)
+│       ├── robinhood_auth.py       # Login & 2FA flow
+│       ├── robinhood_portfolio.py  # Portfolio helpers
+│       └── sql.py                  # MySQL CRUD helpers
+├── backend/
+│   └── routes/sparklines.py
+├── .env.example                  # Template — copy to .env
+├── mysql_schema.sql              # Database schema
+├── run_backend.py                # Backend entry point
+└── requirements.txt
+```
+
+---
+
+## 🔑 API Keys Required
+
+| Service | Purpose | Get one |
+|---|---|---|
+| **Google Gemini** | AI trend insights | [aistudio.google.com](https://aistudio.google.com) |
+| **Finnhub** | Stock news feed | [finnhub.io](https://finnhub.io) |
+| **Robinhood** | Portfolio data (your own account) | — |
+
+---
+
+## 🛡️ Security
+
+All sensitive credentials are loaded exclusively from environment variables.  
+No keys are bundled into client-side JavaScript.  
+See [SECURITY.md](./SECURITY.md) for the full policy.
+
+---
+
+## 🧰 Tech Stack
+
+**Frontend**
+- [Next.js 15](https://nextjs.org) (App Router + Turbopack)
+- [React 19](https://react.dev)
+- [Tailwind CSS 4](https://tailwindcss.com)
+- [Recharts](https://recharts.org) · [Lucide React](https://lucide.dev)
+
+**Backend**
+- [FastAPI](https://fastapi.tiangolo.com)
+- [robin-stocks](https://robin-stocks.readthedocs.io)
+- [yfinance](https://pypi.org/project/yfinance)
+- [PyMySQL](https://pymysql.readthedocs.io)
+
+**AI / Data**
+- [Google Gemini 2.5 Flash](https://ai.google.dev)
+- [Finnhub](https://finnhub.io)
+- [Yahoo Finance](https://finance.yahoo.com)
